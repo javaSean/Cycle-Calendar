@@ -27,7 +27,7 @@ function iconArgs() {
 
 function main() {
   const builderBin = path.join(rootDir, 'node_modules', '.bin', 'electron-builder');
-  const baseArgs = ['--mac', 'dmg'];
+  const baseArgs = ['--mac', 'dmg', '--publish', 'never'];
   const extraArgs = iconArgs();
 
   console.log(`Building ${packageJson.productName || packageJson.name} DMG...`);
