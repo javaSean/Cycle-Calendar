@@ -1,0 +1,1372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Cycle Calendar</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --menstrual: #e8756a;
+      --follicular: #6dbf8c;
+      --ovulatory: #f5c842;
+      --luteal: #9b8ec4;
+      --pms: #c47b9b;
+      --pink: #c2567a;
+      --pink-light: #f9e5ee;
+      --border: #f0dde8;
+    }
+
+    html, body {
+      height: 100%;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #fdf6f9;
+      color: #333;
+      user-select: none;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── TOP BAR ── */
+    #topbar {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      padding: 12px 20px;
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      gap: 10px;
+    }
+    .top-left { display: flex; align-items: center; min-width: 0; }
+    .top-right { display: flex; align-items: center; justify-content: flex-end; }
+
+    #person-select {
+      max-width: 220px;
+      border: 1px solid #e2b4c8;
+      border-radius: 8px;
+      padding: 5px 10px;
+      font-size: 0.85rem;
+      color: #333;
+      background: #fff;
+    }
+    #edit-cycle-btn {
+      width: 30px;
+      height: 30px;
+      margin-left: 8px;
+      border: 1px solid #e2b4c8;
+      border-radius: 8px;
+      background: #fff;
+      color: var(--pink);
+      font-size: 0.95rem;
+      cursor: pointer;
+      line-height: 1;
+    }
+    #edit-cycle-btn:hover { background: var(--pink-light); }
+    #edit-cycle-btn:disabled {
+      opacity: 0.45;
+      cursor: default;
+      background: #faf7f9;
+    }
+    #delete-cycle-btn {
+      width: 30px;
+      height: 30px;
+      margin-left: 6px;
+      border: 1px solid #e9b8c8;
+      border-radius: 8px;
+      background: #fff;
+      color: #bf4f73;
+      font-size: 0.9rem;
+      cursor: pointer;
+      line-height: 1;
+    }
+    #delete-cycle-btn:hover { background: #fdeff4; }
+    #delete-cycle-btn:disabled {
+      opacity: 0.45;
+      cursor: default;
+      background: #faf7f9;
+    }
+
+    #cycle-title {
+      text-align: center;
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--pink);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: min(68vw, 580px);
+    }
+
+    #add-cycle-btn {
+      position: relative;
+      width: 34px; height: 34px;
+      border: 1px solid #e2b4c8;
+      border-radius: 50%;
+      background: #fff;
+      color: var(--pink);
+      font-size: 1.3rem;
+      line-height: 1;
+      cursor: pointer;
+    }
+    #add-cycle-btn:hover { background: var(--pink-light); }
+    #add-cycle-btn::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      right: 0; top: calc(100% + 8px);
+      background: #2c2c34; color: #fff;
+      padding: 6px 8px; border-radius: 6px;
+      font-size: 0.7rem; white-space: nowrap;
+      opacity: 0; pointer-events: none;
+      transform: translateY(-4px);
+      transition: opacity 0.15s, transform 0.15s;
+    }
+    #add-cycle-btn:hover::after { opacity: 1; transform: translateY(0); }
+
+    /* ── STATUS BAR ── */
+    #statusbar {
+      display: flex; justify-content: center;
+      padding: 8px 20px;
+      background: #fff8fb;
+      border-bottom: 1px solid var(--border);
+    }
+    #next-badge {
+      font-size: 0.82rem; font-weight: 600;
+      padding: 6px 14px; border-radius: 20px;
+      background: var(--pink-light); color: var(--pink);
+    }
+
+    /* ── LEGEND ── */
+    #legend {
+      display: flex; gap: 14px; flex-wrap: wrap; justify-content: center;
+      padding: 6px 20px; font-size: 0.76rem;
+      background: #fff8fb; border-bottom: 1px solid var(--border);
+    }
+    .legend-dot {
+      display: inline-block;
+      width: 11px; height: 11px;
+      border-radius: 50%; margin-right: 4px; vertical-align: middle;
+    }
+    .dot-menstrual { background: var(--menstrual); }
+    .dot-follicular { background: var(--follicular); }
+    .dot-ovulatory { background: var(--ovulatory); }
+    .dot-luteal { background: var(--luteal); }
+    .dot-pms { background: var(--pms); }
+    .dot-today { background: #000; }
+
+    /* ── CALENDAR ── */
+    #cal-wrap {
+      padding: 16px 20px 20px;
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .month-nav {
+      display: flex; align-items: center; justify-content: center;
+      gap: 20px; margin-bottom: 10px;
+    }
+    .month-nav button {
+      background: none; border: 1px solid #e2b4c8;
+      border-radius: 8px; padding: 3px 12px;
+      font-size: 1rem; cursor: pointer; color: var(--pink);
+    }
+    .month-nav button:hover { background: var(--pink-light); }
+    .month-nav span { font-weight: 700; font-size: 1rem; color: var(--pink); }
+
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      grid-template-rows: auto repeat(6, minmax(0, 1fr));
+      gap: 5px;
+      flex: 1;
+      min-height: 0;
+    }
+    .dow {
+      text-align: center; font-size: 0.72rem;
+      font-weight: 700; color: #aaa; padding-bottom: 4px;
+    }
+
+    .day-cell {
+      border-radius: 10px;
+      padding: 5px 7px;
+      background: #fff; border: 1px solid var(--border);
+      position: relative; transition: transform 0.1s;
+      cursor: pointer;
+      min-height: 0;
+    }
+    .day-cell:hover { transform: scale(1.03); }
+    .day-cell.empty { background: transparent; border: none; cursor: default; }
+    .day-cell.empty:hover { transform: none; }
+    .day-num {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #555;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
+    }
+
+    /* Phase colour stripe at top */
+    .day-cell::before {
+      content: ''; display: block;
+      height: 6px; border-radius: 3px; margin-bottom: 4px;
+          min-height: 0;
+      background: #efefef;
+    }
+    .day-cell.phase-menstrual::before { background: var(--menstrual); }
+    .day-cell.phase-follicular::before { background: var(--follicular); }
+    .day-cell.phase-ovulatory::before { background: var(--ovulatory); }
+    .day-cell.phase-luteal::before { background: var(--luteal); }
+    .day-cell.phase-pms::before { background: var(--pms); }
+
+    .phase-label {
+      position: absolute;
+      left: 50%;
+      bottom: 5px;
+      transform: translateX(-50%);
+      font-size: 0.62rem;
+      font-weight: 600;
+      margin-top: 0;
+      text-align: center;
+      white-space: nowrap;
+      line-height: 1;
+    }
+    .phase-menstrual .phase-label { color: var(--menstrual); }
+    .phase-follicular .phase-label { color: #3d9e6a; }
+    .phase-ovulatory .phase-label { color: #b89a00; }
+    .phase-luteal .phase-label { color: #7060a8; }
+    .phase-pms .phase-label { color: var(--pms); }
+
+    /* Overflow (prev/next month) days — soft pink fill, full readability */
+    .day-cell.overflow-day {
+      background: #f8dfe9;
+      border-color: #e9bfd1;
+      opacity: 1;
+    }
+
+    /* Today — thick black border */
+    .day-cell.is-today {
+      border: 3px solid #111 !important;
+      box-shadow: 0 0 0 2px rgba(0,0,0,0.12);
+    }
+    .day-cell.is-today .day-num { color: #111; font-weight: 800; }
+
+    .pill-indicator {
+      position: absolute;
+      right: 6px;
+      bottom: 4px;
+      font-size: 0.7rem;
+      line-height: 1;
+      opacity: 0.82;
+      pointer-events: none;
+    }
+    .day-pill-inline {
+      margin-left: 4px;
+      font-size: 0.72rem;
+      line-height: 1;
+      vertical-align: baseline;
+    }
+
+    /* Empty state */
+    #empty-state {
+      position: absolute; inset: 62px 20px 20px;
+      border: 2px dashed #e8bfd0; border-radius: 14px;
+      background: rgba(255,255,255,0.8);
+      display: none; align-items: center; justify-content: center;
+      color: #8d5c6e; font-size: 0.92rem; text-align: center; padding: 18px;
+    }
+    #empty-state.show { display: flex; }
+
+    /* ── DAY DETAIL OVERLAY ── */
+    #detail-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(30,15,22,0.55);
+      z-index: 20;
+      align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    #detail-overlay.open { display: flex; }
+
+    #detail-panel {
+      width: min(94vw, 460px);
+      max-height: 90vh;
+      background: #fff; border-radius: 16px;
+      border: 1px solid var(--border);
+      box-shadow: 0 24px 48px rgba(60,20,40,0.22);
+      display: flex; flex-direction: column;
+      overflow: visible;
+      position: relative;
+    }
+
+    .detail-nav-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1px solid #e2b4c8;
+      background: #fff;
+      color: var(--pink);
+      font-size: 1.05rem;
+      line-height: 1;
+      cursor: pointer;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+    }
+    .detail-nav-btn:hover { background: var(--pink-light); }
+    #detail-prev { left: -40px; }
+    #detail-next { right: -40px; }
+
+    #detail-header {
+      padding: 16px 20px 12px;
+      border-bottom: 1px solid var(--border);
+      position: relative;
+    }
+    #detail-date {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #8f6b79;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+    #detail-phase-bar {
+      height: 6px; border-radius: 3px; margin-bottom: 10px;
+    }
+    #detail-title { font-size: 1.1rem; font-weight: 700; color: #222; }
+    .detail-pms-tag {
+      color: var(--pms);
+      font-size: 0.82em;
+      font-weight: 700;
+      margin-left: 6px;
+    }
+    #detail-subtitle { font-size: 0.8rem; color: #888; margin-top: 2px; }
+    #detail-close {
+      position: absolute; top: 14px; right: 16px;
+      background: none; border: none; font-size: 1.3rem;
+      color: #aaa; cursor: pointer; line-height: 1;
+    }
+    #detail-close:hover { color: #555; }
+
+    #detail-body { overflow-y: visible; padding: 16px 20px 20px; flex: 1; }
+
+    .detail-blurb {
+      font-size: 0.92rem; color: #444; line-height: 1.55;
+      margin-bottom: 14px; font-style: italic;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .detail-card {
+      background: #fdf6f9; border-radius: 10px;
+      border: 1px solid var(--border);
+      padding: 8px 9px;
+    }
+    .detail-card-label {
+      font-size: 0.66rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.06em; color: #a07080; margin-bottom: 3px;
+    }
+    .detail-card-value {
+      font-size: 0.8rem;
+      color: #333;
+      font-weight: 600;
+      line-height: 1.35;
+    }
+
+    .detail-tabs {
+      display: flex;
+      gap: 8px;
+      margin: 4px 0 10px;
+    }
+    .detail-tab-btn {
+      flex: 1;
+      border: 1px solid #e2b4c8;
+      border-radius: 8px;
+      background: #fff;
+      color: #8e6172;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      padding: 7px 10px;
+      cursor: pointer;
+    }
+    .detail-tab-btn.active {
+      background: var(--pink-light);
+      border-color: var(--pink);
+      color: var(--pink);
+    }
+    .detail-tab-panel { display: none; }
+    .detail-tab-panel.active { display: block; }
+
+    .detail-tab-intro {
+      font-size: 0.86rem;
+      color: #444;
+      line-height: 1.5;
+      margin-bottom: 8px;
+      background: #fff8fb;
+      border: 1px solid #f0dde8;
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+
+    .detail-section-title {
+      font-size: 0.73rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.06em; color: #a07080;
+      margin-bottom: 6px; margin-top: 12px;
+    }
+    .detail-partner-tip {
+      display: none;
+    }
+    #detail-phase-desc {
+      font-size: 0.77rem; color: #999; font-style: italic;
+      margin-top: 5px; line-height: 1.5;
+    }
+    .detail-partner-intro {
+      background: #fff5f9; border-left: 3px solid var(--pink);
+      border-radius: 0 8px 8px 0; padding: 10px 14px;
+      font-size: 0.87rem; color: #444; line-height: 1.55;
+      margin-bottom: 8px;
+    }
+    .detail-food-list,
+    .detail-partner-list {
+      list-style: none; padding: 0; margin: 0;
+    }
+    .detail-food-list li,
+    .detail-partner-list li {
+      font-size: 0.86rem; color: #444; line-height: 1.55;
+      padding: 7px 12px 7px 26px; position: relative;
+      border-bottom: 1px solid #f7eef3;
+    }
+    .detail-food-list li:last-child,
+    .detail-partner-list li:last-child { border-bottom: none; }
+    .detail-food-list li::before { content: '\2022'; position: absolute; left: 10px; color: var(--pink); font-size: 1rem; top: 6px; }
+    .detail-partner-list li::before { content: '\2192'; position: absolute; left: 8px; color: var(--pink); font-size: 0.9rem; top: 7px; }
+
+    /* ── MODALS (shared) ── */
+    .modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(47,26,34,0.48);
+      display: none; align-items: center; justify-content: center;
+      padding: 20px; z-index: 30;
+    }
+    .modal-backdrop.open { display: flex; }
+
+    .modal {
+      width: min(94vw, 430px); background: #fff;
+      border-radius: 14px; border: 1px solid var(--border);
+      padding: 18px;
+      box-shadow: 0 22px 40px rgba(79,31,49,0.2);
+    }
+    .modal h2 { font-size: 1.1rem; color: var(--pink); margin-bottom: 6px; }
+    .modal p { font-size: 0.86rem; color: #6f6067; margin-bottom: 14px; }
+    .modal label { display: block; font-size: 0.8rem; color: #705662; margin-bottom: 5px; }
+    .modal input[type="text"],
+    .modal input[type="date"] {
+      width: 100%; border: 1px solid #e2b4c8;
+      border-radius: 8px; padding: 8px 10px;
+      font-size: 0.92rem; margin-bottom: 12px;
+    }
+
+    .radio-group {
+      display: flex; gap: 12px; margin-bottom: 14px;
+    }
+    .radio-option {
+      flex: 1; border: 2px solid #e2b4c8; border-radius: 10px;
+      padding: 10px 12px; cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .radio-option input { display: none; }
+    .radio-option.selected {
+      border-color: var(--pink); background: var(--pink-light);
+    }
+    .radio-option-title { font-size: 0.88rem; font-weight: 700; color: #444; }
+    .radio-option-desc { font-size: 0.73rem; color: #888; margin-top: 2px; }
+    .radio-option.selected .radio-option-title { color: var(--pink); }
+
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 2px; }
+    .btn-secondary, .btn-primary {
+      border: none; border-radius: 8px; padding: 8px 14px;
+      font-size: 0.85rem; cursor: pointer;
+    }
+    .btn-secondary { background: #efe4ea; color: #6e5e66; }
+    .btn-primary { background: var(--pink); color: #fff; }
+    .btn-primary:hover { background: #a8405f; }
+    .btn-secondary:hover { background: #e6d8df; }
+
+    #modal-error { color: #ba345d; font-size: 0.78rem; min-height: 1em; margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+
+<div id="topbar">
+  <div class="top-left">
+    <select id="person-select" aria-label="Select a tracked cycle"></select>
+    <button id="edit-cycle-btn" aria-label="Edit selected cycle" title="Edit selected cycle">&#9998;</button>
+    <button id="delete-cycle-btn" aria-label="Delete selected cycle" title="Delete selected cycle">&#128465;</button>
+  </div>
+  <h1 id="cycle-title">Cycle Calendar</h1>
+  <div class="top-right">
+    <button id="add-cycle-btn" data-tooltip="Add a cycle to track" aria-label="Add a cycle to track">+</button>
+  </div>
+</div>
+
+<div id="statusbar">
+  <div id="next-badge">Add a cycle to track</div>
+</div>
+
+<div id="legend">
+  <span><span class="legend-dot dot-menstrual"></span>Menstrual</span>
+  <span><span class="legend-dot dot-follicular"></span>Follicular</span>
+  <span><span class="legend-dot dot-ovulatory"></span>Ovulatory</span>
+  <span><span class="legend-dot dot-luteal"></span>Luteal</span>
+  <span><span class="legend-dot dot-today"></span>Today</span>
+</div>
+
+<div id="cal-wrap">
+  <div class="month-nav">
+    <button id="prev-month">&#8592;</button>
+    <span id="month-label"></span>
+    <button id="next-month">&#8594;</button>
+  </div>
+  <div class="cal-grid" id="cal-grid"></div>
+  <div id="empty-state">No cycle selected yet. Click the + button to add a cycle to track.</div>
+</div>
+
+<!-- Day detail overlay -->
+<div id="detail-overlay" role="dialog" aria-modal="true">
+  <div id="detail-panel">
+    <button id="detail-prev" class="detail-nav-btn" aria-label="Previous day">&#8592;</button>
+    <button id="detail-next" class="detail-nav-btn" aria-label="Next day">&#8594;</button>
+    <div id="detail-header">
+      <div id="detail-date"></div>
+      <div id="detail-phase-bar"></div>
+      <div id="detail-title"></div>
+      <div id="detail-phase-desc"></div>
+      <div id="detail-subtitle"></div>
+      <button id="detail-close" aria-label="Close">&#x2715;</button>
+    </div>
+    <div id="detail-body">
+      <div class="detail-blurb" id="detail-blurb"></div>
+      <div class="detail-grid" id="detail-grid"></div>
+      <div class="detail-tabs" role="tablist" aria-label="Daily detail tabs">
+        <button id="tab-food" class="detail-tab-btn active" role="tab" aria-selected="true" aria-controls="panel-food" type="button">Food focus</button>
+        <button id="tab-partner" class="detail-tab-btn" role="tab" aria-selected="false" aria-controls="panel-partner" type="button">Partner tips</button>
+      </div>
+
+      <div id="panel-food" class="detail-tab-panel active" role="tabpanel" aria-labelledby="tab-food">
+        <div class="detail-tab-intro" id="detail-food-summary"></div>
+        <ul class="detail-food-list" id="detail-food-list"></ul>
+      </div>
+
+      <div id="panel-partner" class="detail-tab-panel" role="tabpanel" aria-labelledby="tab-partner">
+        <div class="detail-partner-intro" id="detail-partner-intro"></div>
+        <ul class="detail-partner-list" id="detail-partner-list"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add cycle modal -->
+<div id="cycle-modal" class="modal-backdrop" role="dialog" aria-modal="true">
+  <div class="modal">
+    <h2 id="cycle-modal-title">Add cycle to track</h2>
+    <p id="cycle-modal-description">Enter the person and the first day of their most recent period, or for pill users the day they stopped active pills for their most recent break.</p>
+
+    <label for="person-name">Person name</label>
+    <input type="text" id="person-name" maxlength="50" placeholder="e.g. My girlfriend" />
+
+    <label>Cycle type</label>
+    <div class="radio-group">
+      <label class="radio-option selected" id="opt-natural">
+        <input type="radio" name="cycle-type" value="natural" checked />
+        <div class="radio-option-title">Natural</div>
+        <div class="radio-option-desc">Not on the pill</div>
+      </label>
+      <label class="radio-option" id="opt-pill">
+        <input type="radio" name="cycle-type" value="pill" />
+        <div class="radio-option-title">On the pill</div>
+        <div class="radio-option-desc">Taking oral contraceptives</div>
+      </label>
+    </div>
+
+    <label for="cycle-start" id="cycle-start-label">First day of most recent period/bleed</label>
+    <input type="date" id="cycle-start" />
+
+    <div id="modal-error"></div>
+    <div class="modal-actions">
+      <button id="cancel-cycle-btn" class="btn-secondary" type="button">Cancel</button>
+      <button id="save-cycle-btn" class="btn-primary" type="button">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Phase data ──────────────────────────────────────────────────────
+  // 28-day table from the cycle reference sheet.
+  // Each entry: [naturalEnergy, pillEnergy, naturalSexDrive, pillSexDrive, food, movement, _unused, blurb, partnerIntro, partnerBullets[], foodItems[]]
+  const DAY_DATA = [
+    /*1*/  ['Very Low','Low','Low','Low','Iron-rich warm foods','Rest','','Full reset \u2014 your body is shedding and renewing. Rest is medicine right now.',
+      'She is entering the most physically draining part of her cycle. Cramping, bloating, and fatigue are likely. This is a day for nurturing, not solving.',
+      ['Offer a hot water bottle or heating pad without being asked \u2014 heat on the lower back or abdomen relieves uterine cramping directly','Prepare or order her favourite comfort meal so she does not have to think about food','Hold space for quiet \u2014 do not push for conversation, plans, or emotional labour from her today'],
+      ['Lentil soup \u2014 replenishes iron lost during bleeding and soothes the digestive system with warmth','Dark leafy greens like spinach \u2014 high in iron and magnesium to ease cramping and support recovery','Bone broth \u2014 anti-inflammatory, rich in minerals, and deeply nourishing during the heaviest flow days']
+    ],
+    /*2*/  ['Very Low','Low','Low','Low','Magnesium-rich foods','Light walk','','Peak symptoms today. Go slow and honour the heaviness.',
+      'Today is often the heaviest flow day with peak cramping and the lowest energy of the entire cycle. She needs gentleness above all else right now.',
+      ['Check in softly \u2014 a simple message or touch asking how she is feeling goes further than you think','Take small logistics off her plate today without drawing attention to it \u2014 dishes, groceries, or errands','Physical closeness like holding her hand or a gentle back rub can comfort deeply without any pressure'],
+      ['Dark chocolate (70%+) \u2014 high in magnesium which relaxes uterine muscles, reduces cramping, and lifts mood','Pumpkin seeds \u2014 exceptionally dense in magnesium and zinc to actively reduce cramping and support hormone balance','Banana \u2014 potassium and magnesium together reduce muscle tension, ease bloating, and support emotional steadiness']
+    ],
+    /*3*/  ['Low','Low','Low','Low','Protein + iron','Light yoga','','Recovery begins. A little movement helps but take it easy.',
+      'Symptoms are still present but beginning to ease. She is tired but may be slightly more open to gentle connection than the first two days.',
+      ['Light physical touch like a shoulder rub is welcome today \u2014 physical comfort without expectation is meaningful','Keep any plans low-key and pressure-free \u2014 suggest rather than organise','Encourage rest without making her feel guilty for slowing down or cancelling things'],
+      ['Grass-fed beef or lamb \u2014 rich in heme iron, the most bioavailable form, directly replacing what is lost during bleeding','Eggs \u2014 complete protein supporting tissue repair, sustained energy, and hormone precursor production','Chickpeas \u2014 plant-based iron and protein paired with fibre for digestive comfort during recovery']
+    ],
+    /*4*/  ['Low','Low','Low','Low','Balanced meals','Light','','Energy slowly returns. Warmth and comfort are welcome.',
+      'The heaviest days are passing. She is still tired but emotionally may be more open to gentle connection and light conversation.',
+      ['A simple act of care like making tea or quietly tidying up speaks more than words on this day','Light conversation is welcome but let her lead the tone and pace \u2014 do not fill silences unnecessarily','Give her space to move at her own rhythm without commentary or expectation'],
+      ['Sweet potato \u2014 complex carbohydrates for steady energy return plus vitamin A for hormone support','Salmon \u2014 omega-3 fatty acids reduce lingering inflammation and support mood as it begins to lift','Brown rice with steamed vegetables \u2014 grounding, easy to digest, and stabilising for blood sugar as energy recovers']
+    ],
+    /*5*/  ['Low-Med','Med','Low','Low','Fresh whole foods','Walk','','Transition phase \u2014 the fog is lifting.',
+      'The transition out of menstruation is beginning. Energy is returning and she may feel noticeably more like herself. Encouragement lands well today.',
+      ['Suggest a short gentle walk together if she is up for it \u2014 movement helps the body reset and light social time feels good','Acknowledge the shift warmly \u2014 even a simple comment like "you seem like you\'re feeling a bit better" is encouraging','Begin re-engaging socially and emotionally at a pace she sets, not one you impose'],
+      ['Berries \u2014 antioxidants reduce lingering inflammation and support the transition into the follicular phase','Avocado \u2014 healthy fats and folate that help the body prepare for rising oestrogen','Cucumber and fresh leafy greens \u2014 hydrating, alkalising, and easy on digestion during the final transition day']
+    ],
+    /*6*/  ['Medium','Medium','Rising','Moderate','Protein-focused','Moderate','','Stabilizing. A good day to re-enter the world.',
+      'Oestrogen is rising and she is starting to feel like herself again. Energy and mood are stabilising and she will be more open to connection.',
+      ['Re-engage meaningfully \u2014 this is a good day to reconnect emotionally if there was distance during menstruation','Compliment her genuinely \u2014 she is more receptive and appreciative as oestrogen lifts her mood','Suggest a shared activity, even something simple like cooking together or a walk, to rebuild connection'],
+      ['Free-range chicken \u2014 lean protein that fuels the rising energy phase without heaviness','Greek yoghurt \u2014 protein combined with probiotics to support gut health and optimise mood as oestrogen climbs','Quinoa \u2014 a complete protein and complex carbohydrate source providing sustained energy for the rebuilding days']
+    ],
+    /*7*/  ['Medium','Medium','Rising','Moderate','Balanced meals','Moderate','','Back online \u2014 social energy is returning.',
+      'Social and emotional energy is genuinely returning. She is more open to connection, warmer in her interactions, and may begin initiating more.',
+      ['Suggest doing something together \u2014 even something low-key like cooking a meal or watching a film feels meaningful','Be present and engaged when she talks \u2014 she will notice and appreciate your attentiveness now','Physical affection is welcome and will feel good to both of you without it needing to go further'],
+      ['Oats with seeds \u2014 slow-release energy to match building momentum without spikes and crashes','Mixed nuts and nut butter \u2014 healthy fats and protein to stabilise blood sugar and support rising energy','Colourful stir-fry with a variety of vegetables \u2014 diverse phytonutrients to support hormonal balance during oestrogen rise']
+    ],
+    /*8*/  ['Medium','Medium','Rising','Moderate','Clean whole foods','Moderate','','Momentum builds. Good time to make plans.',
+      'Clarity and motivation are building. She is thinking more clearly and beginning to look ahead. This is a great time for shared planning.',
+      ['Discuss future plans or goals together \u2014 she is in a strategic mindset and will enjoy thinking ahead with you','Match her rising energy by being enthusiastic and engaged rather than passive or distracted','Support any new ideas or projects she is excited about \u2014 her confidence in what is possible is growing'],
+      ['Broccoli and cruciferous vegetables \u2014 sulforaphane supports oestrogen metabolism, helping the body use rising hormones effectively','Flaxseeds \u2014 lignans that help balance and process rising oestrogen levels naturally','Wild salmon \u2014 omega-3 fatty acids support brain clarity and healthy hormone production during the follicular phase']
+    ],
+    /*9*/  ['Medium','Medium','Rising','Moderate','Focus foods','Workout','','Clarity rising \u2014 sharp thinking, great for goals.',
+      'Cognitive sharpness is at a high point. She is focused, motivated, and feeling genuinely capable. Her mind is working well today.',
+      ['Encourage and support her goals today \u2014 ask what she is working on and be genuinely interested in the answer','Be a sounding board for her ideas \u2014 she is sharp and will value talking things through with someone who listens','Keep the energy positive and collaborative, not draining or distracting, as she is in a productive flow'],
+      ['Blueberries \u2014 flavonoids that measurably improve memory, focus, and cognitive performance','Walnuts \u2014 omega-3 fatty acids and antioxidants that directly support brain function and mental clarity','Matcha or green tea \u2014 the combination of L-theanine and caffeine provides clean, calm, sustained focus without anxiety']
+    ],
+    /*10*/ ['High','Medium-High','High','Moderate','Fuel up','Workout','','Confidence building. Physical and mental energy are aligning.',
+      'She is feeling physically capable and genuinely confident today. This is one of the stronger energy days of the cycle and she will be receptive to play and enthusiasm.',
+      ['Be playful and light \u2014 she responds well to fun, spontaneous energy as her confidence peaks','Suggest physical activity together \u2014 a workout, hike, or active date aligns with where her body is right now','Express admiration genuinely \u2014 she is feeling good and honest appreciation will land beautifully today'],
+      ['Complex carbohydrates like oats or brown rice \u2014 sustained fuel required for the high-energy physical and mental output of today','Lean protein like turkey or tempeh \u2014 muscle support for increased physical activity and hormone production','Beets \u2014 dietary nitrates improve blood flow and physical endurance, making them ideal for active high-energy days']
+    ],
+    /*11*/ ['High','Medium-High','High','Moderate','Balanced meals','Workout','','Social energy is high \u2014 outgoing and warm.',
+      'She is at her most socially connected today. Outgoing, warm, and engaged with the people around her. She will likely want to spend time with people she cares about.',
+      ['Plan something social together \u2014 dinner out, seeing friends, or a proper date night all fit perfectly today','Engage in deeper conversation \u2014 she is sharp, open, and will enjoy real connection over small talk','Mirror her social energy by being fully present, attentive, and enthusiastic rather than flat or distracted'],
+      ['Legumes like lentils or black beans \u2014 protein and fibre providing sustained energy for socially and physically active days','Citrus fruits \u2014 vitamin C boosts mood and significantly improves iron absorption when eaten alongside iron-rich foods','Leafy greens with olive oil \u2014 nutrient-dense, anti-inflammatory, and supportive of the hormonal environment at its peak']
+    ],
+    /*12*/ ['High','High','High','Moderate','Complex carbs','Intense','','High performance day. Push for what you want.',
+      'Peak follicular energy. She is capable, driven, and physically strong. This is one of the best days of the entire month for ambition and performance.',
+      ['Match her ambition today \u2014 be decisive together, make plans, and be someone who adds energy rather than slows things down','Physical intimacy will feel natural and desired \u2014 she is at or near her hormonal peak and her libido reflects that','Celebrate what she is achieving out loud \u2014 she is firing on all cylinders and genuine recognition means a lot'],
+      ['Whole grain pasta or sweet potato \u2014 premium fuel for intense physical and cognitive output without energy crashes','Chicken or turkey \u2014 lean protein for muscle recovery, sustained energy, and hormone precursor production','Almonds \u2014 magnesium and vitamin E to support hormonal function and protect cells during peak output days']
+    ],
+    /*13*/ ['High','High','High','Moderate','Fuel up','Intense','','Aligned energy \u2014 one of the best days of the cycle.',
+      'Energy is at its peak ahead of ovulation. Confidence, libido, and social connection are all very high. She is feeling aligned and alive.',
+      ['This is an ideal day for a special experience or date \u2014 she is at her best and will make memories easily','Be fully present and engaged \u2014 she is radiating energy and will want a partner who can meet her there','Physical connection is strong and welcome today \u2014 lean into it authentically'],
+      ['Banana with nut butter \u2014 quick energy combined with healthy fats for the final pre-ovulation day','Eggs and avocado \u2014 complete protein and fat-soluble vitamins supporting the hormonal peak','Dark leafy greens \u2014 iron and folate to support the body in the last hours before ovulation is triggered']
+    ],
+    /*14*/ ['Very High','Medium-High','Peak','Moderate','Light fresh foods','Intense','','Peak attraction and charisma. Ovulation day.',
+      'Ovulation day \u2014 the hormonal peak of the entire cycle. She may feel particularly attractive, confident, and magnetic. Every interaction tends to feel more vivid today.',
+      ['Express genuine desire and admiration today \u2014 she is at her most receptive and it will resonate deeply','Make her feel seen and wanted without agenda \u2014 she is radiating energy and your recognition of that matters','Plan something memorable if you can \u2014 this is one of the most powerful days of the cycle for real connection'],
+      ['Cucumber and watermelon \u2014 hydrating and light, supporting the high-energy ovulatory day without heaviness','Pumpkin seeds \u2014 zinc is essential for ovulation and testosterone production, making these ideal today','Pomegranate \u2014 antioxidants protect the releasing egg and naturally support oestrogen at its peak']
+    ],
+    /*15*/ ['High','High','High','Moderate','Balanced meals','Workout','','Strong energy continues post-ovulation.',
+      'Early luteal phase. The hormonal shift has begun but energy is still strong and mood is stable. She is still in a high-output phase.',
+      ['Stay actively engaged \u2014 she is still in productive, capable mode and values a partner who matches that','Physical closeness and affection remain welcome and feel good at this stage of the cycle','Be reliable and consistent \u2014 she is beginning to shift subtly toward valuing security and steadiness over excitement'],
+      ['Salmon or mackerel \u2014 omega-3 fatty acids support the transition into the luteal phase and reduce potential inflammation','Leafy greens with lemon dressing \u2014 iron and vitamin C together sustain the continued energy of this phase','Whole grains \u2014 complex carbohydrates to maintain energy as progesterone begins its gradual rise']
+    ],
+    /*16*/ ['High','High','High','Moderate','Balanced meals','Workout','','Sustained momentum \u2014 make the most of it.',
+      'Progesterone is rising and providing a steady, grounding energy. She may feel focused but slightly more internal than the high-energy days before ovulation.',
+      ['Be present without pressure \u2014 she appreciates consistency and steadiness as progesterone begins to ground her energy','Check in genuinely with how she is feeling as her inner world begins to deepen','Shared activities with a slightly calmer tone work well today \u2014 less wild energy, more meaningful presence'],
+      ['Chicken and vegetable stew \u2014 warming, grounding, and protein-rich to support the luteal phase transition','Sweet potato \u2014 rich in vitamin B6, which directly supports progesterone production and emotional steadiness','Sunflower seeds \u2014 selenium and vitamin E support hormonal balance during the early luteal phase']
+    ],
+    /*17*/ ['Medium','Medium','Moderate','Moderate','Balanced meals','Moderate','','Balanced productivity. Good for focused work.',
+      'A steady, productive day with a slight lean toward more introspective thinking. Mood and energy are balanced but the focus is beginning to shift inward.',
+      ['Have meaningful conversations today \u2014 she is more emotionally tuned in than she was at peak follicular and will appreciate depth','Offer stability and reliability \u2014 this is what she values most as she moves deeper into the luteal phase','Be steady and calm in your presence \u2014 she will feel genuinely supported by your groundedness right now'],
+      ['Brown rice and steamed vegetables \u2014 grounding, easy to digest, and blood-sugar stabilising for mood','Turkey \u2014 tryptophan supports serotonin production as emotional sensitivity begins to deepen','Yoghurt with honey \u2014 probiotics and natural sugars to support the gut-brain connection during mood transitions']
+    ],
+    /*18*/ ['Medium','Medium','Moderate','Moderate','Balanced meals','Moderate','','Grounded energy \u2014 reliable and calm.',
+      'Progesterone is now dominant and the body is calm and present. She may need more emotional support than she did at her peak, even if she does not say so.',
+      ['Ask open questions about how she is feeling physically and emotionally today \u2014 do not assume everything is fine','Acts of service speak loudly in the luteal phase \u2014 help out without being asked and without making it a big deal','Quality time together is preferred over loud social events \u2014 a quiet evening with presence is more nourishing than a party'],
+      ['Beans and legumes \u2014 fibre and B vitamins to support mood regulation and healthy hormone processing','Dark chocolate \u2014 magnesium and mood-lifting compounds that are especially valuable during the more introspective luteal days','Root vegetables like carrots and parsnips \u2014 warming, grounding energy that suits the emotional quality of this phase']
+    ],
+    /*19*/ ['Medium','Medium','Moderate','Moderate','Comfort foods','Moderate','','Emotional depth increases. Great for meaningful talks.',
+      'Emotional sensitivity is increasing. She is more in touch with deeper feelings and needs. This day often brings clarity about what truly matters to her.',
+      ['Listen more than you speak today \u2014 she needs to feel genuinely heard, not redirected or solved','Avoid dismissing or minimising what she is feeling, even if it seems disproportionate \u2014 her nervous system is under real hormonal pressure','Create space for meaningful connection \u2014 a quiet evening together or an honest conversation can be genuinely powerful today'],
+      ['Lentil or vegetable soup \u2014 warming, emotionally comforting, and nutrient-dense for the more sensitive luteal days','Oats with cinnamon and banana \u2014 tryptophan and complex carbohydrates together support serotonin and blood sugar balance','Chamomile tea with honey \u2014 anti-inflammatory, calming to the nervous system, and reduces emotional tension naturally']
+    ],
+    /*20*/ ['Medium-Low','Low','Moderate','Low','Magnesium-rich foods','Light','','Fatigue starts creeping in. Be gentle with expectations.',
+      'Fatigue is beginning to set in noticeably. She may feel heavier both physically and emotionally. Patience and gentle attentiveness go a long way today.',
+      ['Check in gently and more often than usual \u2014 a brief "how are you doing today?" matters more than you might think','Take something concrete off her plate without being asked \u2014 energy management is becoming important for her now','Be patient with slower responses, a quieter mood, or a need for more space \u2014 this is physiological, not personal'],
+      ['Pumpkin seeds \u2014 high magnesium content directly reduces the physical and emotional tension that accompanies early fatigue','Cooked spinach \u2014 iron and magnesium together support energy production and reduce the cramping that can begin now','Dark chocolate \u2014 magnesium combined with mood-supporting compounds helps as the body begins its wind-down']
+    ],
+    /*21*/ ['Low','Low','Low','Low','Comfort foods','Light','','Slow down. The body is winding toward rest.',
+      'The body is clearly signalling that it needs to slow down and rest. Energy is low and emotional needs are growing. This is a day to match her pace.',
+      ['Slow down with her \u2014 match her pace rather than pushing your own agenda or energy onto her','Comfort and cosiness are what she needs most \u2014 suggest a restful evening rather than anything stimulating or demanding','Avoid bringing up stressful topics, making demands of her time, or expecting her to manage your emotions today'],
+      ['Warm porridge with seeds and fruit \u2014 gentle on digestion, emotionally comforting, and nutritionally grounding','Baked salmon with sweet potato \u2014 omega-3 fatty acids and vitamin B6 together support mood and progesterone in the final luteal days','Ginger or peppermint herbal tea \u2014 reduces bloating, soothes the digestive system, and calms the nervous system as the cycle winds down']
+    ],
+    /*22*/ ['Low','Low','Low','Low','Balanced meals','Light','','Energy dipping. Avoid over-scheduling today.',
+      'PMS is beginning. Hormones are dropping and that withdrawal is physiologically real \u2014 it can feel destabilising, irritable, and draining.',
+      ['Reduce unnecessary stressors in her environment where you can \u2014 noise, mess, and conflict all hit harder right now','Validate her feelings without trying to explain or fix them \u2014 right now she needs acknowledgment, not solutions','Small comforts like her favourite snack, a warm blanket, or a genuinely kind word cost you nothing and mean everything'],
+      ['Complex carbohydrates like brown rice or quinoa \u2014 stabilise falling blood sugar which directly and measurably reduces irritability','Magnesium-rich greens like Swiss chard \u2014 reduce nervous system tension and support the body through hormonal withdrawal','Pumpkin seeds \u2014 zinc and magnesium together counteract some of the physical effects of the sharp hormonal drop at PMS onset']
+    ],
+    /*23*/ ['Low','Low','Low','Low','Comfort foods','Light','','Sensitive mood \u2014 a kind word goes a long way.',
+      'Emotional sensitivity is high today. Things that would not normally bother her may feel significant. Her nervous system is under real hormonal pressure.',
+      ['Choose your words carefully today \u2014 she will feel things more intensely than usual and careless comments land harder','A genuine compliment or small moment of warmth can genuinely shift her whole experience of the day','If she is quiet or pulled back, do not take it personally \u2014 just be gently present without pushing for connection she is not offering'],
+      ['Oily fish like sardines or mackerel \u2014 omega-3 fatty acids reduce inflammation and emotional sensitivity through direct neurological pathways','Banana \u2014 serotonin precursors and potassium working together to stabilise mood and reduce physical tension','Warm turmeric milk \u2014 anti-inflammatory properties combined with warming comfort that soothes both the body and nervous system']
+    ],
+    /*24*/ ['Low','Low','Low','Low','Cravings-friendly','Light','','Body needs comfort. Cravings are real and valid.',
+      'Physical discomfort including bloating, breast tenderness, and food cravings is common today. Emotional needs are high and the desire for comfort is physiologically driven.',
+      ['Support her cravings without judgment or commentary \u2014 comfort food is real physiological medicine right now, not weakness','Physical comfort like a hug, lying together on the sofa, or watching something she loves can help enormously today','Do not try to problem-solve her mood or suggest she should feel differently \u2014 just be warm, present, and available'],
+      ['Dark chocolate with nuts \u2014 simultaneously satisfies intense cravings while delivering magnesium, healthy fat, and mood support','Dates and almond butter \u2014 natural sugars, iron, and fat that satisfy the body\'s demand for comfort without triggering a blood sugar crash','Warm grain bowl with roasted vegetables \u2014 deeply comforting and grounding while stabilising blood sugar and avoiding the post-craving slump']
+    ],
+    /*25*/ ['Low','Low','Low','Low','Comfort foods','Rest','','Low tolerance for stress. Keep things quiet.',
+      'Irritability and emotional reactivity are likely today. Her threshold for stress and frustration is at its lowest point in the entire cycle.',
+      ['Avoid conflict at all costs today \u2014 bring calm and gentleness, not challenge, correction, or anything that requires her to defend herself','If she is short-tempered, do not escalate or take it personally \u2014 give her loving space rather than reacting to the surface behaviour','Do something quietly kind without expecting acknowledgment or gratitude \u2014 small acts of care that require nothing back are the most powerful today'],
+      ['Sweet potato in any form \u2014 comfort food that also stabilises blood sugar and provides vitamin B6 which directly supports mood','Chamomile or lemon balm tea \u2014 reduces cortisol levels and soothes the nervous system during the most reactive day of PMS','Chickpea or lentil dish \u2014 plant protein and iron to support the body\'s energy at one of its lowest points']
+    ],
+    /*26*/ ['Very Low','Low','Low','Low','Warm nourishing food','Rest','','Fatigue is strong. Warmth and rest are everything.',
+      'Physical and emotional fatigue are both strong today. She may feel deeply tired, heavy, and in need of genuine rest. This is not the time for demands of any kind.',
+      ['Create a calm, warm, and quiet environment \u2014 reduce noise, demands, and stimulation around her','Handle household logistics and tasks without being asked or making it known \u2014 just quietly carry more than your share','Be a gentle, steady presence \u2014 not too much talking or emotional energy directed at her, just warm and close'],
+      ['Bone broth or miso soup \u2014 deeply nourishing, warming, and easy to digest when physical energy is very low','Stewed fruit with oats \u2014 gentle on the gut, iron-supporting, and emotionally comforting in a way that feels restorative','Ashwagandha in warm milk \u2014 this adaptogenic herb is clinically shown to reduce cortisol and support rest during high-stress hormonal phases']
+    ],
+    /*27*/ ['Very Low','Low','Low','Low','Comfort foods','Rest','','Reset incoming. Space and quiet are gifts right now.',
+      'She is almost through the cycle. The body is preparing for a full reset and she may feel best when given quiet, space, and the absence of demands.',
+      ['Give her room to rest and be still \u2014 quality solitude can be genuinely healing at this point in the cycle','Let her know you are there without crowding her space \u2014 a simple message of affection that expects nothing back is perfect','A kind gesture of love that requires nothing in return is the most powerful thing you can offer on this day'],
+      ['Warm vegetable and lentil soup \u2014 grounding, iron-rich, and easy to prepare when energy is at its lowest','Baked banana or stewed pear \u2014 natural serotonin support and fibre that is gentle on digestion in the final cycle days','Ginger and honey tea \u2014 anti-inflammatory, warming, and shown to reduce the physical heaviness and discomfort of the pre-menstrual state']
+    ],
+    /*28*/ ['Very Low','Low','Low','Low','Nourishing foods','Rest','','Full reset. The cycle ends and begins again.',
+      'The final day of the cycle. Deep fatigue, emotional sensitivity, and the need for gentleness are all strong. She has been through a complete month and deserves to be held through the end of it.',
+      ['Acknowledge the end of the cycle with genuine care \u2014 she has navigated a full hormonal journey and that deserves recognition','Be soft and nurturing \u2014 physical closeness without any expectation or agenda is the most meaningful thing today','Tomorrow brings renewal. Be someone who holds her with tenderness through the closing of this chapter'],
+      ['Iron-rich foods like red meat or dark lentils \u2014 prepare the body for the imminent bleed and replenish iron stores proactively','Vitamin C-rich foods alongside iron \u2014 orange, red pepper, or kiwi dramatically increase iron absorption when eaten in the same meal','Full-fat yoghurt with seeds \u2014 probiotic support for the gut reset that naturally accompanies the start of a new cycle']
+    ],
+  ];
+
+  const PHASE_DESCRIPTIONS = {
+    natural: {
+      menstrual: 'The uterine lining sheds during this phase, causing bleeding that typically lasts 3\u20137 days. Oestrogen and progesterone are at their lowest. You may feel tired, crampy, and drawn inward \u2014 lower back ache, bloating, and breast tenderness are common. It is a biological signal to slow down and rest.',
+      follicular: 'Oestrogen begins rising after menstruation ends, gradually lifting energy, mood, and mental clarity. Brain fog clears, motivation returns, and social energy rebuilds. You may feel increasingly confident and capable. This phase often feels like a natural fresh start.',
+      ovulatory: 'The hormonal peak of the entire cycle. A surge in LH triggers the release of an egg. Oestrogen and testosterone peak together, producing the highest natural energy, libido, and social confidence of the month. You may feel magnetic, articulate, and physically strong.',
+      luteal: 'After ovulation, progesterone rises and the body begins preparing for a potential pregnancy. Early luteal feels productive and grounded. As the phase progresses, energy gradually decreases, emotional sensitivity deepens, and focus turns inward.',
+      pms: 'Oestrogen and progesterone drop sharply in the days before menstruation. This hormonal withdrawal can cause irritability, fatigue, bloating, breast tenderness, food cravings, and emotional sensitivity. The nervous system is under real physiological stress \u2014 these feelings are not just in your head.'
+    },
+    pill: {
+      menstrual: 'On the pill, the bleed during the pill-free week is a withdrawal bleed rather than a true period \u2014 it is triggered by the drop in synthetic hormones rather than the natural cycle. You may experience lighter bleeding and less cramping than a natural period, though fatigue and lower energy are still common.',
+      follicular: 'The combined pill suppresses natural hormonal fluctuations, providing a steadier hormone environment during the active pill days. Energy and mood tend to feel more consistent compared to a natural cycle. Many people find focus and creativity feel reliable and steady during this phase.',
+      ovulatory: 'The pill prevents ovulation by suppressing the LH surge. While the body does not physically ovulate, it still follows a hormonal rhythm. Around mid-cycle many pill users notice a subtle lift in energy and confidence, even though the hormonal peak is significantly blunted compared to a natural cycle.',
+      luteal: 'The progestin in the pill mimics progesterone during this phase. Some people feel slightly heavier, more emotionally inward, or mildly bloated as progestin levels influence the body. Energy may be steady but the reflective, inward quality of this phase is still felt by many.',
+      pms: 'As you approach the hormone-free interval, the withdrawal of synthetic hormones can trigger PMS-like symptoms including mood dips, irritability, headaches, and fatigue. These are real hormonal withdrawal effects and vary significantly from person to person.'
+    }
+  };
+
+  // Natural cycle phases (day 1-28)
+  // Common 28-day reference model:
+  // menstrual 1-5, follicular 6-12, ovulatory 13-16, luteal 17-28
+  const NATURAL_PHASES = [
+    'menstrual','menstrual','menstrual','menstrual','menstrual', // 1-5
+    'follicular','follicular','follicular','follicular','follicular','follicular','follicular', // 6-12
+    'ovulatory','ovulatory','ovulatory','ovulatory', // 13-16
+    'luteal','luteal','luteal','luteal','luteal','luteal','luteal','luteal','luteal','luteal','luteal','luteal' // 17-28
+  ];
+
+  // Pill cycle phases (day 1-28)
+  // Input anchor for pill users is day 1 of the hormone-free break (day active pills are stopped).
+  // Combined oral contraceptives suppress true ovulation and flatten hormonal swings.
+  // We mirror natural phase lengths here so users can see which parts are being suppressed.
+  const PILL_PHASES = [
+    'menstrual','menstrual','menstrual','menstrual','menstrual','menstrual','menstrual', // 1-7
+    'follicular','follicular','follicular','follicular','follicular','follicular','follicular', // 8-14
+    'ovulatory','ovulatory', // 15-16
+    'luteal','luteal','luteal','luteal','luteal','luteal','luteal','luteal','luteal','luteal','luteal','luteal' // 17-28
+  ];
+
+  const PHASE_COLORS = {
+    menstrual: '#e8756a',
+    follicular: '#6dbf8c',
+    ovulatory: '#f5c842',
+    luteal: '#9b8ec4',
+    pms: '#c47b9b',
+    unknown: '#efefef'
+  };
+
+  const PHASE_LABELS = {
+    menstrual: 'Menstrual',
+    follicular: 'Follicular',
+    ovulatory: 'Ovulatory',
+    luteal: 'Luteal',
+    pms: 'PMS',
+    unknown: ''
+  };
+
+  const CYCLE_LEN = 28;
+  const PILL_RECOMMENDATION_DELAY_DAYS = 2;
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const DOW_LABELS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  // ── Persistence ─────────────────────────────────────────────────────
+  const CYCLES_KEY = 'cyclesV2';
+  const ACTIVE_CYCLE_KEY = 'activeCycleId';
+
+  let cycles = [];
+  let activeCycleId = null;
+  let viewYear, viewMonth;
+  let modalForced = false;
+  let modalMode = 'add';
+  let editingCycleId = null;
+  let detailDate = null;
+  let detailCycleId = null;
+
+  function loadCycles() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(CYCLES_KEY) || '[]');
+      return Array.isArray(parsed) ? parsed.filter(c => c && c.id && c.name && c.startDate) : [];
+    } catch { return []; }
+  }
+
+  function saveCycles() { localStorage.setItem(CYCLES_KEY, JSON.stringify(cycles)); }
+  function loadActiveId() { return localStorage.getItem(ACTIVE_CYCLE_KEY) || null; }
+  function saveActiveId(id) {
+    if (!id) localStorage.removeItem(ACTIVE_CYCLE_KEY);
+    else localStorage.setItem(ACTIVE_CYCLE_KEY, id);
+  }
+
+  function getActiveCycle() {
+    return cycles.find(c => c.id === activeCycleId) || null;
+  }
+
+  function syncActiveId() {
+    if (!cycles.length) { activeCycleId = null; saveActiveId(null); return; }
+    if (!cycles.some(c => c.id === activeCycleId)) {
+      activeCycleId = cycles[0].id; saveActiveId(activeCycleId);
+    }
+  }
+
+  // ── Cycle math ──────────────────────────────────────────────────────
+  function today() {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
+  function toDateStr(d) {
+    return d.getFullYear() + '-' +
+      String(d.getMonth()+1).padStart(2,'0') + '-' +
+      String(d.getDate()).padStart(2,'0');
+  }
+
+  function parseDate(str) {
+    if (!str) return null;
+    const [y,m,d] = str.split('-').map(Number);
+    return new Date(y, m-1, d);
+  }
+
+  function cycleDay(targetDate, startStr, type) {
+    const start = parseDate(startStr);
+    if (!start) return null;
+    const diff = Math.round((targetDate - start) / 86400000);
+    const idx = ((diff % CYCLE_LEN) + CYCLE_LEN) % CYCLE_LEN;
+    return idx + 1; // 1-based
+  }
+
+  function phaseFor(targetDate, cycle) {
+    const day = cycleDay(targetDate, cycle.startDate, cycle.type);
+    if (!day) return 'unknown';
+    const phases = cycle.type === 'pill' ? PILL_PHASES : NATURAL_PHASES;
+    return phases[day - 1] || 'unknown';
+  }
+
+  function ordinalSuffix(dayNum) {
+    const v = dayNum % 100;
+    if (v >= 11 && v <= 13) return 'th';
+    if (dayNum % 10 === 1) return 'st';
+    if (dayNum % 10 === 2) return 'nd';
+    if (dayNum % 10 === 3) return 'rd';
+    return 'th';
+  }
+
+  function formatDateWithOrdinal(dateObj) {
+    const dayNum = dateObj.getDate();
+    return MONTHS[dateObj.getMonth()] + ' ' + dayNum + ordinalSuffix(dayNum);
+  }
+
+  function isOnPillDay(targetDate, cycle) {
+    if (!cycle || cycle.type !== 'pill') return false;
+    const day = cycleDay(targetDate, cycle.startDate, cycle.type);
+    if (!day) return false;
+    // Day 1 = stop-pill day. Break is day 1-7, active pills day 8-28.
+    return day >= 8 && day <= 28;
+  }
+
+  function isLateLutealPmsAspect(day, cycleType) {
+    // Keep PMS as a late-luteal aspect in a 28-day reference model.
+    if (cycleType === 'pill') return day >= 24 && day <= 28;
+    return day >= 24 && day <= 28;
+  }
+
+  function recommendationIndexFor(day, cycleType) {
+    const base = day - 1;
+    if (cycleType !== 'pill') return base;
+    return ((base - PILL_RECOMMENDATION_DELAY_DAYS) % CYCLE_LEN + CYCLE_LEN) % CYCLE_LEN;
+  }
+
+  // ── Badge ────────────────────────────────────────────────────────────
+  function updateBadge(cycle) {
+    const badge = document.getElementById('next-badge');
+    if (!cycle) { badge.textContent = 'Add a cycle to track'; return; }
+    const t = today();
+    const currentPhase = phaseFor(t, cycle);
+    let next = new Date(t);
+    for (let i = 0; i < 28; i++) {
+      next.setDate(next.getDate() + 1);
+      if (phaseFor(next, cycle) !== currentPhase) break;
+    }
+    const daysAway = Math.round((next - t) / 86400000);
+    const nextPhase = phaseFor(next, cycle);
+    const when = daysAway === 1 ? 'tomorrow' : 'in ' + daysAway + ' days';
+    badge.textContent = cycle.name + ': ' + PHASE_LABELS[nextPhase] + ' starts ' + when + ' (' + toDateStr(next) + ')';
+  }
+
+  // ── Calendar render ──────────────────────────────────────────────────
+  function renderCalendar() {
+    const active = getActiveCycle();
+    const grid = document.getElementById('cal-grid');
+    grid.innerHTML = '';
+
+    DOW_LABELS.forEach(d => {
+      const el = document.createElement('div');
+      el.className = 'dow'; el.textContent = d;
+      grid.appendChild(el);
+    });
+
+    const firstDay = new Date(viewYear, viewMonth, 1);
+    const startDow = firstDay.getDay();
+    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+    const todayStr = toDateStr(today());
+
+    const prevMonthDays = new Date(viewYear, viewMonth, 0).getDate();
+    for (let i = 0; i < startDow; i++) {
+      const dayNum = prevMonthDays - startDow + 1 + i;
+      const dateObj = new Date(viewYear, viewMonth - 1, dayNum);
+      const phase = active ? phaseFor(dateObj, active) : 'unknown';
+
+      const cell = document.createElement('div');
+      cell.className = 'day-cell phase-' + phase + ' overflow-day';
+
+      const numEl = document.createElement('div');
+      numEl.className = 'day-num'; numEl.textContent = dayNum;
+      if (active && isOnPillDay(dateObj, active)) {
+        const pillInline = document.createElement('span');
+        pillInline.className = 'day-pill-inline';
+        pillInline.textContent = '\uD83D\uDC8A';
+        numEl.appendChild(pillInline);
+      }
+      cell.appendChild(numEl);
+
+      if (active && phase !== 'unknown') {
+        const lbl = document.createElement('div');
+        lbl.className = 'phase-label';
+        lbl.textContent = PHASE_LABELS[phase];
+        cell.appendChild(lbl);
+      }
+      if (active) cell.addEventListener('click', () => openDetail(dateObj, active));
+      grid.appendChild(cell);
+    }
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateObj = new Date(viewYear, viewMonth, d);
+      const dateStr = toDateStr(dateObj);
+      const phase = active ? phaseFor(dateObj, active) : 'unknown';
+
+      const cell = document.createElement('div');
+      cell.className = 'day-cell phase-' + phase;
+      if (dateStr === todayStr) cell.classList.add('is-today');
+
+      const numEl = document.createElement('div');
+      numEl.className = 'day-num'; numEl.textContent = d;
+      if (active && isOnPillDay(dateObj, active)) {
+        const pillInline = document.createElement('span');
+        pillInline.className = 'day-pill-inline';
+        pillInline.textContent = '\uD83D\uDC8A';
+        numEl.appendChild(pillInline);
+      }
+      cell.appendChild(numEl);
+
+      if (active && phase !== 'unknown') {
+        const lbl = document.createElement('div');
+        lbl.className = 'phase-label';
+        lbl.textContent = PHASE_LABELS[phase];
+        cell.appendChild(lbl);
+      }
+
+      if (active) {
+        cell.addEventListener('click', () => openDetail(dateObj, active));
+      }
+
+      grid.appendChild(cell);
+    }
+
+    document.getElementById('month-label').textContent = MONTHS[viewMonth] + ' ' + viewYear;
+
+    // Always render 6 full weeks so cells can stretch consistently with window height.
+    const totalCells = startDow + daysInMonth;
+    const trailingCount = Math.max(0, 42 - totalCells);
+    for (let d = 1; d <= trailingCount; d++) {
+      const dateObj = new Date(viewYear, viewMonth + 1, d);
+      const phase = active ? phaseFor(dateObj, active) : 'unknown';
+
+      const cell = document.createElement('div');
+      cell.className = 'day-cell phase-' + phase + ' overflow-day';
+
+      const numEl = document.createElement('div');
+      numEl.className = 'day-num'; numEl.textContent = d;
+      if (active && isOnPillDay(dateObj, active)) {
+        const pillInline = document.createElement('span');
+        pillInline.className = 'day-pill-inline';
+        pillInline.textContent = '\uD83D\uDC8A';
+        numEl.appendChild(pillInline);
+      }
+      cell.appendChild(numEl);
+
+      if (active && phase !== 'unknown') {
+        const lbl = document.createElement('div');
+        lbl.className = 'phase-label';
+        lbl.textContent = PHASE_LABELS[phase];
+        cell.appendChild(lbl);
+      }
+      if (active) cell.addEventListener('click', () => openDetail(dateObj, active));
+      grid.appendChild(cell);
+    }
+  }
+
+  // ── Top bar / select ─────────────────────────────────────────────────
+  function renderSelect() {
+    const sel = document.getElementById('person-select');
+    const editBtn = document.getElementById('edit-cycle-btn');
+    const deleteBtn = document.getElementById('delete-cycle-btn');
+    sel.innerHTML = '';
+    if (!cycles.length) {
+      const o = document.createElement('option');
+      o.textContent = 'No cycles tracked yet'; o.value = '';
+      sel.appendChild(o);
+      sel.disabled = true;
+      editBtn.disabled = true;
+      deleteBtn.disabled = true;
+      return;
+    }
+    cycles.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.id; o.textContent = c.name;
+      if (c.id === activeCycleId) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.disabled = false;
+    editBtn.disabled = false;
+    deleteBtn.disabled = false;
+  }
+
+  function cycleLabel(name) {
+    if (!name) return 'Cycle Calendar';
+    const t = name.trim();
+    return t.endsWith('s') ? t + "' Cycle" : t + "'s Cycle";
+  }
+
+  function refreshView() {
+    syncActiveId();
+    renderSelect();
+    const active = getActiveCycle();
+    document.getElementById('cycle-title').textContent = active ? cycleLabel(active.name) : 'Cycle Calendar';
+    updateBadge(active);
+    renderCalendar();
+    document.getElementById('empty-state').classList.toggle('show', !cycles.length);
+  }
+
+    function openDetail(dateObj, cycle) {
+      detailDate = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+      detailCycleId = cycle.id;
+
+      const day = cycleDay(dateObj, cycle.startDate, cycle.type);
+      if (!day) return;
+      const phases = cycle.type === 'pill' ? PILL_PHASES : NATURAL_PHASES;
+      const phase = phases[day - 1];
+      const data = DAY_DATA[recommendationIndexFor(day, cycle.type)];
+      const isPill = cycle.type === 'pill';
+
+      const energy = isPill ? data[1] : data[0];
+      const sexDrive = isPill ? data[3] : data[2];
+      const food = data[4];
+      const movement = data[5];
+      const blurb = data[7];
+      const partnerIntro = data[8];
+      const partnerBullets = data[9] || [];
+      const foodItems = data[10] || [];
+      const showPmsAspect = phase === 'luteal' && isLateLutealPmsAspect(day, cycle.type);
+
+      const color = PHASE_COLORS[phase] || '#ccc';
+      document.getElementById('detail-phase-bar').style.background = color;
+      document.getElementById('detail-date').textContent = cycle.name + ' \u00b7 ' + formatDateWithOrdinal(dateObj);
+      document.getElementById('detail-title').innerHTML =
+        'Day ' + day + ' \u2014 ' + PHASE_LABELS[phase] +
+        (showPmsAspect ? '<span class="detail-pms-tag">PMS</span>' : '');
+      const descSet = (PHASE_DESCRIPTIONS[cycle.type] || PHASE_DESCRIPTIONS.natural);
+      const phaseDesc = showPmsAspect ? (descSet.pms || descSet.luteal || '') : (descSet[phase] || '');
+      document.getElementById('detail-phase-desc').textContent = phaseDesc;
+      document.getElementById('detail-subtitle').textContent = '';
+      document.getElementById('detail-blurb').textContent = blurb;
+
+      const gridEl = document.getElementById('detail-grid');
+      gridEl.innerHTML = '';
+      [['Energy', energy], ['Sex drive', sexDrive], ['Movement', movement]].forEach(([label, value]) => {
+        const card = document.createElement('div');
+        card.className = 'detail-card';
+        card.innerHTML = '<div class="detail-card-label">' + label + '</div><div class="detail-card-value">' + value + '</div>';
+        gridEl.appendChild(card);
+      });
+
+      document.getElementById('detail-food-summary').textContent = food;
+      const foodList = document.getElementById('detail-food-list');
+      foodList.innerHTML = '';
+      foodItems.forEach(item => { const li = document.createElement('li'); li.textContent = item; foodList.appendChild(li); });
+
+      document.getElementById('detail-partner-intro').textContent = partnerIntro;
+      const partnerList = document.getElementById('detail-partner-list');
+      partnerList.innerHTML = '';
+      partnerBullets.forEach(tip => { const li = document.createElement('li'); li.textContent = tip; partnerList.appendChild(li); });
+
+      setDetailTab('food');
+
+      document.getElementById('detail-overlay').classList.add('open');
+    }
+
+  function setDetailTab(tabName) {
+    const isFood = tabName === 'food';
+    const foodBtn = document.getElementById('tab-food');
+    const partnerBtn = document.getElementById('tab-partner');
+    const foodPanel = document.getElementById('panel-food');
+    const partnerPanel = document.getElementById('panel-partner');
+
+    foodBtn.classList.toggle('active', isFood);
+    partnerBtn.classList.toggle('active', !isFood);
+    foodBtn.setAttribute('aria-selected', isFood ? 'true' : 'false');
+    partnerBtn.setAttribute('aria-selected', isFood ? 'false' : 'true');
+    foodPanel.classList.toggle('active', isFood);
+    partnerPanel.classList.toggle('active', !isFood);
+  }
+
+  function moveDetailBy(days) {
+    if (!detailDate || !detailCycleId) return;
+    const cycle = cycles.find(c => c.id === detailCycleId) || getActiveCycle();
+    if (!cycle) return;
+    const nextDate = new Date(detailDate);
+    nextDate.setDate(nextDate.getDate() + days);
+    openDetail(nextDate, cycle);
+  }
+
+  function closeDetail() {
+    document.getElementById('detail-overlay').classList.remove('open');
+  }
+
+  // ── Add-cycle modal ──────────────────────────────────────────────────
+  function setCycleType(type) {
+    const target = type === 'pill' ? 'pill' : 'natural';
+    document.querySelectorAll('.radio-option').forEach(opt => {
+      const input = opt.querySelector('input');
+      const selected = input.value === target;
+      input.checked = selected;
+      opt.classList.toggle('selected', selected);
+    });
+    document.getElementById('cycle-start-label').textContent =
+      target === 'pill' ? 'Day you stopped active pills (most recent break)' : 'First day of most recent period';
+  }
+
+  function resetCycleModalFields() {
+    document.getElementById('person-name').value = '';
+    document.getElementById('cycle-start').value = '';
+    setCycleType('natural');
+  }
+
+  function openModal(force, mode = 'add', cycleToEdit = null) {
+    modalForced = !!force;
+    modalMode = mode;
+    editingCycleId = cycleToEdit ? cycleToEdit.id : null;
+
+    const titleEl = document.getElementById('cycle-modal-title');
+    const descEl = document.getElementById('cycle-modal-description');
+    const saveBtn = document.getElementById('save-cycle-btn');
+
+    if (mode === 'edit' && cycleToEdit) {
+      titleEl.textContent = 'Edit cycle';
+      descEl.textContent = 'Update the person name, cycle type, or cycle start date.';
+      saveBtn.textContent = 'Save changes';
+      document.getElementById('person-name').value = cycleToEdit.name;
+      document.getElementById('cycle-start').value = cycleToEdit.startDate;
+      setCycleType(cycleToEdit.type || 'natural');
+    } else {
+      titleEl.textContent = 'Add cycle to track';
+      descEl.textContent = 'Enter the person and the first day of their most recent period, or for pill users the day they stopped active pills for their most recent break.';
+      saveBtn.textContent = 'Save';
+      resetCycleModalFields();
+    }
+
+    document.getElementById('cycle-modal').classList.add('open');
+    document.getElementById('cancel-cycle-btn').style.display = force ? 'none' : 'inline-block';
+    document.getElementById('modal-error').textContent = '';
+    document.getElementById('person-name').focus();
+  }
+
+  function openEditModal() {
+    const active = getActiveCycle();
+    if (!active) return;
+    openModal(false, 'edit', active);
+  }
+
+  function deleteActiveCycle() {
+    const active = getActiveCycle();
+    if (!active) return;
+    const ok = confirm('Delete cycle for ' + active.name + '? This cannot be undone.');
+    if (!ok) return;
+
+    cycles = cycles.filter(c => c.id !== active.id);
+    saveCycles();
+
+    if (detailCycleId === active.id) closeDetail();
+
+    if (editingCycleId === active.id) {
+      document.getElementById('cycle-modal').classList.remove('open');
+      modalMode = 'add';
+      editingCycleId = null;
+      modalForced = false;
+    }
+
+    syncActiveId();
+    saveActiveId(activeCycleId);
+    refreshView();
+  }
+
+  function closeModal() {
+    if (modalForced) return;
+    document.getElementById('cycle-modal').classList.remove('open');
+    document.getElementById('modal-error').textContent = '';
+    modalMode = 'add';
+    editingCycleId = null;
+  }
+
+  function saveCycleFromModal() {
+    const name = document.getElementById('person-name').value.trim();
+    const startDate = document.getElementById('cycle-start').value;
+    const type = document.querySelector('input[name="cycle-type"]:checked').value;
+    const errEl = document.getElementById('modal-error');
+
+    if (!name) { errEl.textContent = 'Enter a name before saving.'; return; }
+    if (!startDate) { errEl.textContent = 'Select a start date before saving.'; return; }
+
+    if (modalMode === 'edit' && editingCycleId) {
+      const idx = cycles.findIndex(c => c.id === editingCycleId);
+      if (idx >= 0) {
+        cycles[idx] = { ...cycles[idx], name, startDate, type };
+      }
+      activeCycleId = editingCycleId;
+    } else {
+      const cycle = {
+        id: Date.now() + '-' + Math.random().toString(36).slice(2,8),
+        name, startDate, type
+      };
+      cycles.push(cycle);
+      activeCycleId = cycle.id;
+    }
+    saveCycles();
+    saveActiveId(activeCycleId);
+
+    resetCycleModalFields();
+    document.getElementById('cycle-modal').classList.remove('open');
+    modalForced = false;
+    modalMode = 'add';
+    editingCycleId = null;
+    refreshView();
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────
+  const t = today();
+  viewYear = t.getFullYear(); viewMonth = t.getMonth();
+  cycles = loadCycles();
+  activeCycleId = loadActiveId();
+  syncActiveId();
+
+  // Radio toggle
+  document.querySelectorAll('.radio-option').forEach(opt => {
+    opt.addEventListener('click', () => {
+      document.querySelectorAll('.radio-option').forEach(o => o.classList.remove('selected'));
+      opt.classList.add('selected');
+      opt.querySelector('input').checked = true;
+      const isPill = opt.querySelector('input').value === 'pill';
+      document.getElementById('cycle-start-label').textContent =
+        isPill ? 'Day you stopped active pills (most recent break)' : 'First day of most recent period';
+    });
+  });
+
+  document.getElementById('prev-month').addEventListener('click', () => {
+    if (viewMonth === 0) { viewMonth = 11; viewYear--; } else viewMonth--;
+    refreshView();
+  });
+  document.getElementById('next-month').addEventListener('click', () => {
+    if (viewMonth === 11) { viewMonth = 0; viewYear++; } else viewMonth++;
+    refreshView();
+  });
+  document.getElementById('person-select').addEventListener('change', e => {
+    activeCycleId = e.target.value; saveActiveId(activeCycleId); refreshView();
+  });
+  document.getElementById('edit-cycle-btn').addEventListener('click', openEditModal);
+  document.getElementById('delete-cycle-btn').addEventListener('click', deleteActiveCycle);
+  document.getElementById('add-cycle-btn').addEventListener('click', () => openModal(false));
+  document.getElementById('cancel-cycle-btn').addEventListener('click', closeModal);
+  document.getElementById('save-cycle-btn').addEventListener('click', saveCycleFromModal);
+  document.getElementById('cycle-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('cycle-modal') && !modalForced) closeModal();
+  });
+  document.getElementById('tab-food').addEventListener('click', () => setDetailTab('food'));
+  document.getElementById('tab-partner').addEventListener('click', () => setDetailTab('partner'));
+  document.getElementById('detail-close').addEventListener('click', closeDetail);
+  document.getElementById('detail-prev').addEventListener('click', () => moveDetailBy(-1));
+  document.getElementById('detail-next').addEventListener('click', () => moveDetailBy(1));
+  document.getElementById('detail-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('detail-overlay')) closeDetail();
+  });
+  document.addEventListener('keydown', e => {
+    if (document.getElementById('detail-overlay').classList.contains('open')) {
+      if (e.key === 'ArrowLeft') { moveDetailBy(-1); return; }
+      if (e.key === 'ArrowRight') { moveDetailBy(1); return; }
+    }
+    if (e.key === 'Escape') {
+      if (document.getElementById('detail-overlay').classList.contains('open')) closeDetail();
+      else if (document.getElementById('cycle-modal').classList.contains('open') && !modalForced) closeModal();
+    }
+  });
+
+  refreshView();
+  if (!cycles.length) openModal(true);
+</script>
+</body>
+</html>

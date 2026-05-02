@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/icon.icns
+build/icon.iconset/
+
+# OS/editor files
+.DS_Store
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
